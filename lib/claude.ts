@@ -4,6 +4,8 @@ export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+export const MODEL = 'claude-opus-4-5'
+
 export const SYSTEM_PROMPT = `Você é JurisIA, uma assistente jurídica especializada no direito brasileiro.
 
 Seu papel é auxiliar advogados e equipes jurídicas com:

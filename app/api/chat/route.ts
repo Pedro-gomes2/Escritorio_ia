@@ -28,44 +28,56 @@ export async function POST(request: Request) {
       }
     }
 
-    // Envia apenas role + content para a API (sem timestamp)
     const apiMessages = messages.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }))
 
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-5',
+    // Chama a API de forma não-streaming primeiro para garantir resposta
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-5',
       max_tokens: 4096,
       system: systemPrompt,
       messages: apiMessages,
+      stream: true,
     })
 
     const encoder = new TextEncoder()
+    let fullText = ''
+
     const readable = new ReadableStream({
       async start(controller) {
-        let fullText = ''
         try {
-          for await (const chunk of stream) {
-            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-              const text = chunk.delta.text
+          for await (const event of response) {
+            if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta'
+            ) {
+              const text = event.delta.text
               fullText += text
               controller.enqueue(encoder.encode(text))
             }
           }
+        } catch (streamErr) {
+          console.error('[stream error]', streamErr)
         } finally {
           controller.close()
         }
 
-        // Salva conversa no banco após stream terminar
+        // Salva no banco após o stream terminar
         if (conversaId && fullText) {
-          const newMessages = [
-            ...messages,
-            { role: 'assistant', content: fullText, timestamp: new Date().toISOString() },
-          ]
-          await supabase.from('conversas_ia')
-            .update({ mensagens: newMessages, updated_at: new Date().toISOString() })
-            .eq('id', conversaId)
+          try {
+            const newMessages = [
+              ...messages,
+              { role: 'assistant', content: fullText, timestamp: new Date().toISOString() },
+            ]
+            await supabase
+              .from('conversas_ia')
+              .update({ mensagens: newMessages, updated_at: new Date().toISOString() })
+              .eq('id', conversaId)
+          } catch (dbErr) {
+            console.error('[db save error]', dbErr)
+          }
         }
       },
     })
@@ -75,7 +87,7 @@ export async function POST(request: Request) {
     })
 
   } catch (error: unknown) {
-    console.error('[chat/route]', error)
+    console.error('[chat/route error]', error)
     const msg = error instanceof Error ? error.message : 'Erro interno'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
