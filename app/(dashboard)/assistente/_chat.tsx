@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Bot, Send, Upload, FileText, Plus, Loader2,
-  MessageSquare, X, ChevronDown
+  MessageSquare, X, ChevronDown, AlertCircle, Trash2,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -29,15 +29,16 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
   const [enviando, setEnviando] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [resposta, setResposta] = useState('')
+  const [erro, setErro] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensagens, resposta])
 
-  async function novaConversa() {
+  // Retorna o ID da conversa criada — resolve a race condition
+  async function criarConversa(): Promise<string | null> {
     const { data } = await supabase.from('conversas_ia').insert({
       usuario_id: userId,
       titulo: 'Nova conversa',
@@ -49,6 +50,23 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
       setConversaAtual(data.id)
       setMensagens([])
       setDocSelecionado(null)
+      return data.id
+    }
+    return null
+  }
+
+  async function novaConversa() {
+    await criarConversa()
+  }
+
+  async function excluirConversa(e: React.MouseEvent, id: string) {
+    e.stopPropagation()
+    if (!confirm('Excluir esta conversa?')) return
+    await supabase.from('conversas_ia').delete().eq('id', id)
+    setConversas(prev => prev.filter(c => c.id !== id))
+    if (conversaAtual === id) {
+      setConversaAtual(null)
+      setMensagens([])
     }
   }
 
@@ -58,6 +76,7 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
       setConversaAtual(id)
       setMensagens(data.mensagens ?? [])
       setDocSelecionado(data.documento_id)
+      setErro('')
     }
   }
 
@@ -70,11 +89,11 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
     formData.append('file', file)
 
     const res = await fetch('/api/upload', { method: 'POST', body: formData })
-    const { documento } = await res.json()
+    const json = await res.json()
 
-    if (documento) {
-      setDocumentos(prev => [documento, ...prev])
-      setDocSelecionado(documento.id)
+    if (json.documento) {
+      setDocumentos(prev => [json.documento, ...prev])
+      setDocSelecionado(json.documento.id)
     }
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -82,9 +101,16 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
 
   async function enviarMensagem() {
     if (!input.trim() || enviando) return
+    setErro('')
 
-    if (!conversaAtual) {
-      await novaConversa()
+    // Garante que há uma conversa — captura o ID diretamente (sem depender do state)
+    let conversaId = conversaAtual
+    if (!conversaId) {
+      conversaId = await criarConversa()
+      if (!conversaId) {
+        setErro('Erro ao criar conversa. Verifique a conexão com o Supabase.')
+        return
+      }
     }
 
     const novaMensagem: Mensagem = {
@@ -95,47 +121,66 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
 
     const novasMensagens = [...mensagens, novaMensagem]
     setMensagens(novasMensagens)
+    const textoEnviado = input.trim()
     setInput('')
     setEnviando(true)
     setResposta('')
 
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: novasMensagens,
-        documentoId: docSelecionado,
-        conversaId: conversaAtual,
-      }),
-    })
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: novasMensagens,
+          documentoId: docSelecionado,
+          conversaId,
+        }),
+      })
 
-    if (!res.body) { setEnviando(false); return }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? `Erro ${res.status}`)
+      }
 
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let textoCompleto = ''
+      if (!res.body) throw new Error('Resposta vazia da API')
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value)
-      textoCompleto += chunk
-      setResposta(textoCompleto)
-    }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let textoCompleto = ''
 
-    const msgAssistente: Mensagem = {
-      role: 'assistant',
-      content: textoCompleto,
-      timestamp: new Date().toISOString(),
-    }
-    setMensagens(prev => [...prev, msgAssistente])
-    setResposta('')
-    setEnviando(false)
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        textoCompleto += decoder.decode(value, { stream: true })
+        setResposta(textoCompleto)
+      }
 
-    if (conversaAtual && novasMensagens.length === 1) {
-      const titulo = input.slice(0, 50)
-      await supabase.from('conversas_ia').update({ titulo }).eq('id', conversaAtual)
-      setConversas(prev => prev.map(c => c.id === conversaAtual ? { ...c, titulo } : c))
+      if (!textoCompleto) throw new Error('A IA não retornou nenhuma resposta.')
+
+      const msgAssistente: Mensagem = {
+        role: 'assistant',
+        content: textoCompleto,
+        timestamp: new Date().toISOString(),
+      }
+      setMensagens(prev => [...prev, msgAssistente])
+      setResposta('')
+
+      // Atualiza título da conversa na primeira mensagem
+      if (novasMensagens.length === 1) {
+        const titulo = textoEnviado.slice(0, 50)
+        await supabase.from('conversas_ia').update({ titulo }).eq('id', conversaId)
+        setConversas(prev => prev.map(c => c.id === conversaId ? { ...c, titulo } : c))
+      }
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro desconhecido'
+      setErro(`Falha ao enviar: ${msg}`)
+      // Remove a mensagem do usuário se não houve resposta
+      setMensagens(prev => prev.slice(0, -1))
+      setInput(textoEnviado)
+    } finally {
+      setEnviando(false)
+      setResposta('')
     }
   }
 
@@ -165,17 +210,30 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
             <p className="text-xs text-slate-400 text-center py-6">Nenhuma conversa ainda</p>
           ) : (
             conversas.map(c => (
-              <button key={c.id} onClick={() => abrirConversa(c.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-colors ${
-                  conversaAtual === c.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
+              <div key={c.id}
+                className={`group flex items-center gap-1 rounded-lg mb-0.5 pr-1 transition-colors ${
+                  conversaAtual === c.id ? 'bg-blue-50' : 'hover:bg-slate-50'
                 }`}>
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="text-sm truncate">{c.titulo}</span>
-                </div>
-                <span className="text-xs text-slate-400 ml-5.5">{formatDate(c.created_at)}</span>
-              </button>
+                <button onClick={() => abrirConversa(c.id)}
+                  className={`flex-1 text-left px-3 py-2.5 min-w-0 ${
+                    conversaAtual === c.id ? 'text-blue-700' : 'text-slate-700'
+                  }`}>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="text-sm truncate">{c.titulo}</span>
+                  </div>
+                  <span className="text-xs text-slate-400 ml-5">{formatDate(c.created_at)}</span>
+                </button>
+                <button
+                  onClick={e => excluirConversa(e, c.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
+                  title="Excluir conversa"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))
+
           )}
         </div>
       </div>
@@ -192,7 +250,6 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
             <p className="text-xs text-slate-400">Especializada em direito brasileiro</p>
           </div>
 
-          {/* Seletor de documento */}
           <div className="flex items-center gap-2">
             {docAtual ? (
               <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium">
@@ -289,6 +346,17 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Erro */}
+        {erro && (
+          <div className="mx-4 mb-2 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2.5 rounded-xl">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {erro}
+            <button onClick={() => setErro('')} className="ml-auto text-red-400 hover:text-red-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Input */}
         <div className="bg-white border-t border-slate-200 p-4 flex-shrink-0">
           {docAtual && (
@@ -299,7 +367,6 @@ export default function AssistenteChat({ userId, conversasIniciais, documentosDi
           )}
           <div className="flex gap-3 items-end">
             <textarea
-              ref={textareaRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { UserCircle, Scale } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import EditarPerfilForm from './_editar-perfil'
+import AdicionarMembro from './_adicionar-membro'
 
 const cargoLabel: Record<string, string> = {
   socio: 'Sócio(a)', advogado: 'Advogado(a)', estagiario: 'Estagiário(a)',
@@ -23,9 +24,12 @@ export default async function EquipePage() {
 
   return (
     <div className="p-8 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Equipe</h1>
-        <p className="text-slate-500 text-sm mt-1">{profiles?.length ?? 0} membro(s) no escritório</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Equipe</h1>
+          <p className="text-slate-500 text-sm mt-1">{profiles?.length ?? 0} membro(s) no escritório</p>
+        </div>
+        <AdicionarMembro />
       </div>
 
       {meuPerfil && (
