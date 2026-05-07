@@ -1,4 +1,4 @@
-import { genAI, SYSTEM_PROMPT } from '@/lib/gemini'
+import { genAI, SYSTEM_PROMPT, GEMINI_MODEL } from '@/lib/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const ultimaMensagem = messages[messages.length - 1]
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL,
       systemInstruction: systemPrompt,
     })
 
