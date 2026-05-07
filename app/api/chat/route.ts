@@ -1,4 +1,4 @@
-import { anthropic, SYSTEM_PROMPT } from '@/lib/claude'
+import { genAI, SYSTEM_PROMPT } from '@/lib/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -28,19 +28,23 @@ export async function POST(request: Request) {
       }
     }
 
-    const apiMessages = messages.map((m: { role: string; content: string }) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }))
+    // Separa o histórico da última mensagem do usuário
+    const historico = messages.slice(0, -1)
+    const ultimaMensagem = messages[messages.length - 1]
 
-    // Chama a API de forma não-streaming primeiro para garantir resposta
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: apiMessages,
-      stream: true,
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: systemPrompt,
     })
+
+    const chat = model.startChat({
+      history: historico.map((m: { role: string; content: string }) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+    })
+
+    const result = await chat.sendMessageStream(ultimaMensagem.content)
 
     const encoder = new TextEncoder()
     let fullText = ''
@@ -48,12 +52,9 @@ export async function POST(request: Request) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of response) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              const text = event.delta.text
+          for await (const chunk of result.stream) {
+            const text = chunk.text()
+            if (text) {
               fullText += text
               controller.enqueue(encoder.encode(text))
             }
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
           controller.close()
         }
 
-        // Salva no banco após o stream terminar
+        // Salva conversa no banco
         if (conversaId && fullText) {
           try {
             const newMessages = [
