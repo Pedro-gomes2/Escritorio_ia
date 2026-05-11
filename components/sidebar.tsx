@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, CheckSquare,
-  DollarSign, Bot, UserCircle, LogOut, Scale,
+  DollarSign, UserCircle, LogOut, Scale, Calculator, MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,7 +16,8 @@ const navItems = [
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
-  { href: '/assistente', label: 'Assistente IA', icon: Bot },
+  { href: '/previdencia', label: 'Previdência', icon: Calculator },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { href: '/equipe', label: 'Equipe', icon: UserCircle },
 ]
 

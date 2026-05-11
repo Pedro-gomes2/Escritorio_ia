@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, Pencil, Plus, Clock, FileText, CheckSquare } from 'lucide-react'
 import { formatDate, formatDateTime, formatMoeda, prazoUrgencia } from '@/lib/utils'
 import MovimentacaoForm from '../../_components/movimentacao-form'
+import DeleteProcessoButton from '../_components/delete-processo-button'
 
 const statusColor: Record<string, string> = {
   ativo: 'bg-green-100 text-green-700',
@@ -47,11 +48,14 @@ export default async function ProcessoDetailPage({ params }: { params: Promise<{
           </div>
           {processo.numero && <p className="text-slate-500 text-sm">{processo.numero}</p>}
         </div>
-        <Link href={`/processos/${id}/editar`}
-          className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium">
-          <Pencil className="w-4 h-4" />
-          Editar
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/processos/${id}/editar`}
+            className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium">
+            <Pencil className="w-4 h-4" />
+            Editar
+          </Link>
+          <DeleteProcessoButton id={id} titulo={processo.titulo} redirectAfter />
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-6">
@@ -154,9 +158,9 @@ export default async function ProcessoDetailPage({ params }: { params: Promise<{
                 <FileText className="w-4 h-4 text-green-500" />
                 Documentos
               </h3>
-              <Link href={`/assistente?processo_id=${id}`} className="text-xs text-blue-600 hover:underline">
-                + Upload
-              </Link>
+              <span className="text-xs text-slate-400">
+                {documentos?.length ?? 0} arquivo(s)
+              </span>
             </div>
             {documentos?.length === 0 ? (
               <p className="text-xs text-slate-400 p-4">Sem documentos</p>

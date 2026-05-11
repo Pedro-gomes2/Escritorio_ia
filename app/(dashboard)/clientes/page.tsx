@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus, Search, Users, Phone, Mail, Building2, User } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import DeleteClienteButton from './_components/delete-cliente-button'
 
 export default async function ClientesPage({
   searchParams,
@@ -62,48 +63,47 @@ export default async function ClientesPage({
         ) : (
           <div className="divide-y divide-slate-100">
             {clientes?.map(cliente => (
-              <Link
-                key={cliente.id}
-                href={`/clientes/${cliente.id}`}
-                className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  {cliente.tipo === 'pj'
-                    ? <Building2 className="w-5 h-5 text-blue-600" />
-                    : <User className="w-5 h-5 text-blue-600" />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{cliente.nome}</p>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    {cliente.cpf_cnpj && (
-                      <span className="text-xs text-slate-500">{cliente.cpf_cnpj}</span>
-                    )}
-                    {cliente.email && (
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Mail className="w-3 h-3" />{cliente.email}
-                      </span>
-                    )}
-                    {cliente.telefone && (
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Phone className="w-3 h-3" />{cliente.telefone}
-                      </span>
-                    )}
+              <div key={cliente.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+                <Link href={`/clientes/${cliente.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    {cliente.tipo === 'pj'
+                      ? <Building2 className="w-5 h-5 text-blue-600" />
+                      : <User className="w-5 h-5 text-blue-600" />
+                    }
                   </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    cliente.tipo === 'pj'
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {cliente.tipo === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
-                  </span>
-                  <p className="text-xs text-slate-400 mt-1">
-                    desde {formatDate(cliente.created_at)}
-                  </p>
-                </div>
-              </Link>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-800 truncate">{cliente.nome}</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {cliente.cpf_cnpj && (
+                        <span className="text-xs text-slate-500">{cliente.cpf_cnpj}</span>
+                      )}
+                      {cliente.email && (
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Mail className="w-3 h-3" />{cliente.email}
+                        </span>
+                      )}
+                      {cliente.telefone && (
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />{cliente.telefone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      cliente.tipo === 'pj'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {cliente.tipo === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">
+                      desde {formatDate(cliente.created_at)}
+                    </p>
+                  </div>
+                </Link>
+                <DeleteClienteButton id={cliente.id} nome={cliente.nome} />
+              </div>
             ))}
           </div>
         )}

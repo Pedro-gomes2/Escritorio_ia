@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
   FolderOpen, CheckSquare, DollarSign, AlertCircle,
-  Clock, TrendingUp, Users, Bot, ArrowRight
+  Clock, TrendingUp, Users,
 } from 'lucide-react'
 import { formatDate, formatMoeda, prazoUrgencia } from '@/lib/utils'
 
@@ -162,21 +162,8 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Atalhos e processos recentes */}
+        {/* Processos recentes */}
         <div className="col-span-1 space-y-4">
-          {/* Atalho assistente IA */}
-          <Link href="/assistente"
-            className="block bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-5 text-white hover:from-blue-700 hover:to-blue-800 transition-all">
-            <div className="flex items-center gap-3 mb-2">
-              <Bot className="w-6 h-6" />
-              <span className="font-semibold">Assistente IA</span>
-            </div>
-            <p className="text-sm text-blue-100">Analise documentos e pesquise jurisprudência com inteligência artificial</p>
-            <div className="flex items-center gap-1 text-xs text-blue-200 mt-3">
-              Acessar assistente <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-
           {/* Processos recentes */}
           <div className="bg-white rounded-xl border border-slate-200">
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
