@@ -135,6 +135,16 @@ interface ClienteItem {
   nome: string
 }
 
+// ─── Field fora do componente para não remontar a cada render ─────────────────
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 export default function PrevidenciaPage() {
   const supabase = createClient()
   const [clientes, setClientes] = useState<ClienteItem[]>([])
@@ -195,15 +205,6 @@ export default function PrevidenciaPage() {
       form.inicioContribuicao,
     )
     setPlano(p)
-  }
-
-  function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-        {children}
-      </div>
-    )
   }
 
   const inputClass = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
