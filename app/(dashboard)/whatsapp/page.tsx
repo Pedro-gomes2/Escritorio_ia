@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronLeft, MessageSquare, Phone, RefreshCw, MessageCircle, Clock, Wifi, WifiOff, QrCode } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, ChevronLeft, MessageSquare, Phone, RefreshCw, MessageCircle, Clock, Wifi, WifiOff, QrCode, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Coluna = 'novo' | 'atendendo' | 'aguardando' | 'finalizado'
@@ -64,6 +64,8 @@ export default function WhatsappPage() {
   const [evoStatus, setEvoStatus] = useState<EvoStatus | null>(null)
   const [showQR, setShowQR] = useState(false)
   const [loadingQR, setLoadingQR] = useState(false)
+  const [resposta, setResposta] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const supabase = createClient()
 
   async function buscarStatusEvo() {
@@ -82,6 +84,33 @@ export default function WhatsappPage() {
 
   const evoConectado = evoStatus?.instance?.state === 'open' || evoStatus?.state === 'open'
   const qrBase64 = evoStatus?.qrcode?.base64 || evoStatus?.base64
+
+  async function enviarResposta() {
+    if (!historico?.whatsapp_jid || !resposta.trim()) return
+    setEnviando(true)
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jid: historico.whatsapp_jid,
+          mensagem: resposta.trim(),
+          atendimentoId: historico.id,
+        }),
+      })
+      if (res.ok) {
+        const novaMensagem = { texto: resposta.trim(), timestamp: new Date().toISOString(), de: 'Você' }
+        setHistorico(h => h ? { ...h, mensagens: [...(h.mensagens || []), novaMensagem] } : h)
+        setAtendimentos(prev => prev.map(a => a.id === historico.id
+          ? { ...a, mensagens: [...(a.mensagens || []), novaMensagem], ultima_mensagem: resposta.trim() }
+          : a
+        ))
+        setResposta('')
+      }
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   async function carregar() {
     const { data } = await supabase
@@ -324,18 +353,45 @@ export default function WhatsappPage() {
                   </a>
                 )}
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-96">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-72">
                 {(!historico.mensagens || historico.mensagens.length === 0) ? (
                   <p className="text-xs text-slate-400 text-center py-8">Sem mensagens registradas</p>
                 ) : (
                   historico.mensagens.map((msg, i) => (
-                    <div key={i} className="bg-slate-50 rounded-lg p-3">
+                    <div key={i} className={`rounded-lg p-3 ${msg.de === 'Você' ? 'bg-blue-50 ml-4' : 'bg-slate-50 mr-4'}`}>
                       <p className="text-xs text-slate-800">{msg.texto}</p>
                       <p className="text-xs text-slate-400 mt-1">{msg.de} · {horaRelativa(msg.timestamp)}</p>
                     </div>
                   ))
                 )}
               </div>
+
+              {/* Campo de resposta */}
+              {historico.whatsapp_jid ? (
+                <div className="p-3 border-t border-slate-100">
+                  <div className="flex gap-2">
+                    <textarea
+                      value={resposta}
+                      onChange={e => setResposta(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarResposta() } }}
+                      placeholder="Digite sua resposta... (Enter para enviar)"
+                      rows={2}
+                      className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                    />
+                    <button
+                      onClick={enviarResposta}
+                      disabled={enviando || !resposta.trim()}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 rounded-lg transition-colors disabled:opacity-50 flex items-center"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 text-center">Atendimento manual — sem número WhatsApp vinculado</p>
+                </div>
+              )}
             </div>
           )}
         </div>
