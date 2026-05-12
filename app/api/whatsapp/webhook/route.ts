@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const EVO_URL = process.env.EVOLUTION_API_URL!
+const EVO_KEY = process.env.EVOLUTION_API_KEY!
+const INSTANCE = process.env.EVOLUTION_INSTANCE!
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -19,12 +23,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Extrai número real apenas para JIDs @s.whatsapp.net/@c.us
-    // Para @lid, o número não é um telefone real — deixa null
     const isLid = jid.includes('@lid')
-    const telefone = isLid
-      ? null
-      : jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
+    let telefone: string | null = null
+
+    if (isLid) {
+      // Consulta a Evolution API para obter o número real a partir do LID
+      const lidNumero = jid.replace('@lid', '')
+      try {
+        const res = await fetch(`${EVO_URL}/chat/whatsappNumbers/${INSTANCE}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
+          body: JSON.stringify({ numbers: [lidNumero] }),
+        })
+        if (res.ok) {
+          const result = await res.json()
+          const contato = Array.isArray(result) ? result[0] : result
+          if (contato?.number) telefone = contato.number
+          else if (contato?.jid) telefone = contato.jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
+        }
+      } catch { /* mantém null se falhar */ }
+    } else {
+      telefone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
+    }
     const nome = data?.pushName || data?.verifiedBizName || telefone
     const texto: string =
       data?.message?.conversation ||
@@ -38,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const { data: existente } = await supabase
       .from('atendimentos_whatsapp')
-      .select('id, mensagens')
+      .select('id, mensagens, telefone')
       .eq('whatsapp_jid', jid)
       .neq('coluna', 'finalizado')
       .order('created_at', { ascending: false })
@@ -47,13 +67,18 @@ export async function POST(req: NextRequest) {
 
     if (existente) {
       const mensagens = Array.isArray(existente.mensagens) ? existente.mensagens : []
+      const updatePayload: Record<string, unknown> = {
+        mensagens: [...mensagens, novaMensagem],
+        ultima_mensagem: texto,
+        ultimo_contato: timestamp,
+        nao_lido: true,
+      }
+      // Atualiza telefone se estava null e agora temos o número real
+      if (telefone && !existente.telefone) updatePayload.telefone = telefone
+
       await supabase
         .from('atendimentos_whatsapp')
-        .update({
-          mensagens: [...mensagens, novaMensagem],
-          ultima_mensagem: texto,
-          ultimo_contato: timestamp,
-        })
+        .update(updatePayload)
         .eq('id', existente.id)
     } else {
       await supabase.from('atendimentos_whatsapp').insert({
@@ -65,6 +90,8 @@ export async function POST(req: NextRequest) {
         mensagens: [novaMensagem],
         ultima_mensagem: texto,
         ultimo_contato: timestamp,
+        nao_lido: true,
+        tags: [],
       })
     }
 
