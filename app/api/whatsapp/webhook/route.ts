@@ -25,23 +25,24 @@ export async function POST(req: NextRequest) {
 
     const isLid = jid.includes('@lid')
     let telefone: string | null = null
+    let whatsappJidEnvio = jid // JID usado para enviar mensagens
 
     if (isLid) {
-      // Consulta a Evolution API para obter o número real a partir do LID
-      const lidNumero = jid.replace('@lid', '')
-      try {
-        const res = await fetch(`${EVO_URL}/chat/whatsappNumbers/${INSTANCE}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
-          body: JSON.stringify({ numbers: [lidNumero] }),
-        })
-        if (res.ok) {
-          const result = await res.json()
-          const contato = Array.isArray(result) ? result[0] : result
-          if (contato?.number) telefone = contato.number
-          else if (contato?.jid) telefone = contato.jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
-        }
-      } catch { /* mantém null se falhar */ }
+      // Tenta extrair número real de outros campos do payload
+      // data.sender pode conter o JID real com número de telefone
+      const sender: string = data?.sender ?? data?.pushName ?? ''
+      if (sender.includes('@s.whatsapp.net') || sender.includes('@c.us')) {
+        telefone = sender.replace('@s.whatsapp.net', '').replace('@c.us', '')
+        whatsappJidEnvio = sender // usa o JID real para envio
+      }
+
+      // Log para debug (remover depois de confirmar funcionamento)
+      console.log('Webhook @lid debug:', JSON.stringify({
+        jid,
+        sender: data?.sender,
+        pushName: data?.pushName,
+        keys: Object.keys(data ?? {}),
+      }))
     } else {
       telefone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
     }
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     const { data: existente } = await supabase
       .from('atendimentos_whatsapp')
       .select('id, mensagens, telefone')
-      .eq('whatsapp_jid', jid)
+      .or(`whatsapp_jid.eq.${jid},whatsapp_jid.eq.${whatsappJidEnvio}`)
       .neq('coluna', 'finalizado')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
       await supabase.from('atendimentos_whatsapp').insert({
         nome,
         telefone,
-        whatsapp_jid: jid,
+        whatsapp_jid: whatsappJidEnvio, // usa JID com número real se disponível
         assunto: texto.slice(0, 200),
         coluna: 'novo',
         mensagens: [novaMensagem],
