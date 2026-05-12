@@ -144,9 +144,12 @@ export default function WhatsappPage() {
   const evoConectado = evoStatus?.instance?.state === 'open' || evoStatus?.state === 'open'
   const qrBase64 = evoStatus?.qrcode?.base64 || evoStatus?.base64
 
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null)
+
   async function enviarResposta() {
     if (!historico?.whatsapp_jid || !resposta.trim()) return
     setEnviando(true)
+    setErroEnvio(null)
     try {
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST',
@@ -157,6 +160,7 @@ export default function WhatsappPage() {
           atendimentoId: historico.id,
         }),
       })
+      const data = await res.json()
       if (res.ok) {
         const novaMensagem = { texto: resposta.trim(), timestamp: new Date().toISOString(), de: 'Você' }
         setHistorico(h => h ? { ...h, mensagens: [...(h.mensagens || []), novaMensagem] } : h)
@@ -166,7 +170,11 @@ export default function WhatsappPage() {
         ))
         setResposta('')
         setShowRespostas(false)
+      } else {
+        setErroEnvio(data?.error || `Erro ${res.status}`)
       }
+    } catch (e) {
+      setErroEnvio('Erro de conexão com o servidor')
     } finally {
       setEnviando(false)
     }
@@ -644,6 +652,14 @@ export default function WhatsappPage() {
               {/* Campo de resposta */}
               {historico.whatsapp_jid ? (
                 <div className="p-3 border-t border-slate-100">
+                  {erroEnvio && (
+                    <div className="mb-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                      <p className="text-xs text-red-600">{erroEnvio}</p>
+                      <button onClick={() => setErroEnvio(null)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                   {/* Respostas rápidas dropdown */}
                   {showRespostas && respostas.length > 0 && (
                     <div className="mb-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
