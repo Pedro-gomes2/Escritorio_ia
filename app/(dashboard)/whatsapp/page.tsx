@@ -344,7 +344,7 @@ export default function WhatsappPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex -m-8 bg-white overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex bg-white overflow-hidden" style={{ height: '100vh' }}>
 
       {/* ══ LEFT: Lista de conversas ══════════════════════════════════════════ */}
       <div className="w-80 flex flex-col border-r border-slate-200 bg-white flex-shrink-0">
