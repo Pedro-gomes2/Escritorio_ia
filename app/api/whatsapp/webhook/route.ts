@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const telefone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
+    // Extrai número real apenas para JIDs @s.whatsapp.net/@c.us
+    // Para @lid, o número não é um telefone real — deixa null
+    const isLid = jid.includes('@lid')
+    const telefone = isLid
+      ? null
+      : jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
     const nome = data?.pushName || data?.verifiedBizName || telefone
     const texto: string =
       data?.message?.conversation ||

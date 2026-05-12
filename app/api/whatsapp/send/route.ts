@@ -19,7 +19,26 @@ export async function POST(req: NextRequest) {
     }
 
     // Extrai número limpo do JID
-    const numero = jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
+    // JIDs @lid são identificadores internos do WhatsApp — precisamos do número real
+    let numero = jid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@lid', '')
+
+    // Se ainda parece LID (número muito longo ou sem prefixo de país), busca o atendimento
+    if (jid.includes('@lid') && atendimentoId) {
+      const supabase = createAdminClient()
+      const { data: atend } = await supabase
+        .from('atendimentos_whatsapp')
+        .select('telefone')
+        .eq('id', atendimentoId)
+        .single()
+      if (atend?.telefone) {
+        numero = atend.telefone.replace(/\D/g, '')
+        if (!numero.startsWith('55')) numero = '55' + numero
+      } else {
+        return NextResponse.json({
+          error: 'Contato usa formato LID — adicione o telefone manualmente no card para poder responder'
+        }, { status: 400 })
+      }
+    }
 
     // Envia mensagem via Evolution API v1
     const res = await fetch(`${EVO_URL}/message/sendText/${INSTANCE}`, {
