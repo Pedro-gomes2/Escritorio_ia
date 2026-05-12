@@ -271,7 +271,7 @@ export default function PrevidenciaPage() {
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { label: 'Idade mínima', value: `${plano.idadeAposentadoria} anos`, sub: plano.faltaIdadeMeses === 0 ? '✓ Atingida' : `Faltam ${anos(plano.faltaIdadeMeses)}`, ok: plano.faltaIdadeMeses === 0 },
-                  { label: 'Contribuição mínima', value: `${plano.contribuicaoMinima} anos`, sub: plano.faltaContribuicaoMeses === 0 ? '✓ Atingida' : `Faltam ${anos(plano.faltaContribuicaoMeses)}`, ok: plano.faltaContribuicaoMeses === 0 },
+                  { label: 'Contribuição mínima', value: `${plano.contribuicaoMinimaAnos} anos`, sub: plano.faltaContribuicaoMeses === 0 ? '✓ Atingida' : `Faltam ${anos(plano.faltaContribuicaoMeses)}`, ok: plano.faltaContribuicaoMeses === 0 },
                   { label: 'Benefício estimado INSS', value: moeda(plano.estimativaBeneficio), sub: `${Math.round(plano.estimativaBeneficio / plano.salarioBruto * 100)}% do salário bruto`, ok: true },
                 ].map(({ label, value, sub, ok }) => (
                   <div key={label} className={`bg-white rounded-xl border p-4 shadow-sm ${ok ? 'border-green-200' : 'border-amber-200'}`}>
