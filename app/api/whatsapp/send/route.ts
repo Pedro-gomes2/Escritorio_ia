@@ -13,6 +13,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
+    if (!EVO_URL || !EVO_KEY || !INSTANCE) {
+      console.error('Variáveis de ambiente faltando:', { EVO_URL: !!EVO_URL, EVO_KEY: !!EVO_KEY, INSTANCE: !!INSTANCE })
+      return NextResponse.json({ error: 'Variáveis de ambiente não configuradas no servidor' }, { status: 500 })
+    }
+
     // Extrai número limpo do JID
     const numero = jid.replace('@s.whatsapp.net', '').replace('@c.us', '')
 
@@ -31,8 +36,8 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('Erro Evolution API:', err)
-      return NextResponse.json({ error: 'Falha ao enviar mensagem' }, { status: 500 })
+      console.error('Erro Evolution API:', res.status, err)
+      return NextResponse.json({ error: `Evolution API ${res.status}: ${err}` }, { status: 500 })
     }
 
     // Salva a mensagem enviada no histórico do atendimento
