@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Calculator, User, TrendingUp, Clock, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
+import Link from 'next/link'
+import { Calculator, User, TrendingUp, Clock, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, FileText, BarChart3 } from 'lucide-react'
 
 // Tabelas INSS 2024 (progressiva)
 const INSS_FAIXAS = [
@@ -174,14 +175,18 @@ export default function PrevidenciaPage() {
 
   return (
     <div className="p-8 max-w-5xl">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
           <Calculator className="w-5 h-5 text-blue-600" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-800">Plano Previdenciário</h1>
           <p className="text-slate-500 text-sm">Análise personalizada para o cliente</p>
         </div>
+        <Link href="/previdencia/cnis"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">
+          <BarChart3 className="w-4 h-4" />Análise de CNIS
+        </Link>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
