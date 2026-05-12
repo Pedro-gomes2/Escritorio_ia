@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   Upload, FileText, Loader2, CheckCircle2, AlertCircle, TrendingUp,
   Calendar, Clock, DollarSign, User, ChevronDown, ChevronUp,
-  Download, Info, Award, ArrowRight, BarChart3, X,
+  Info, Award, ArrowRight, BarChart3, X, Users,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import type { ResultadoBeneficio, ResultadoTransicao } from '@/lib/previdencia/calculos'
 
 // ─── Tipos locais ─────────────────────────────────────────────────────────────
@@ -29,14 +31,22 @@ interface RespostaAPI {
   error?: string
 }
 
+interface ClienteItem {
+  id: string
+  nome: string
+  cpf_cnpj: string | null
+}
+
+interface ExtratoAnterior {
+  sexo: string | null
+  data_nascimento: string | null
+  total_competencias: number
+  created_at: string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function moeda(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-function ptBR(iso: string | null): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  return d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })
 }
 function formatDate(d: Date | string | null): string {
   if (!d) return '-'
@@ -69,13 +79,16 @@ function BadgeRegra({ regra, elegivel }: { regra: string; elegivel: boolean }) {
   )
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-export default function CNISPage() {
+// ─── Componente interno (usa useSearchParams) ─────────────────────────────────
+function CNISPage() {
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get('clienteId')
+  const supabase = createClient()
 
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [clienteId, setClienteId] = useState(clienteIdParam ?? '')
+  const [clientes, setClientes] = useState<ClienteItem[]>([])
+  const [extratoAnterior, setExtratoAnterior] = useState<ExtratoAnterior | null>(null)
   const [sexo, setSexo] = useState<'M' | 'F' | ''>('')
   const [dataNasc, setDataNasc] = useState('')
   const [carregando, setCarregando] = useState(false)
@@ -84,6 +97,36 @@ export default function CNISPage() {
   const [showCompetencias, setShowCompetencias] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Carrega lista de clientes ao montar
+  useEffect(() => {
+    async function carregarClientes() {
+      const { data } = await supabase
+        .from('clientes')
+        .select('id, nome, cpf_cnpj')
+        .order('nome')
+      setClientes(data ?? [])
+    }
+    carregarClientes()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quando clienteId muda, busca extrato anterior
+  useEffect(() => {
+    if (!clienteId) { setExtratoAnterior(null); return }
+    async function buscarExtrato() {
+      const { data } = await supabase
+        .from('cnis_extratos')
+        .select('sexo, data_nascimento, total_competencias, created_at')
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setExtratoAnterior(data ?? null)
+      if (data?.sexo && !sexo) setSexo(data.sexo as 'M' | 'F')
+      if (data?.data_nascimento && !dataNasc) setDataNasc(data.data_nascimento)
+    }
+    buscarExtrato()
+  }, [clienteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Upload ──────────────────────────────────────────────────────────────────
   async function importar() {
@@ -124,6 +167,9 @@ export default function CNISPage() {
   const r = resultado?.resultado
   const d = resultado?.dados
 
+  // Nome do cliente selecionado para exibição
+  const clienteSelecionado = clientes.find(c => c.id === clienteId)
+
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full overflow-y-auto bg-slate-50">
@@ -135,9 +181,9 @@ export default function CNISPage() {
           <h1 className="text-lg font-bold text-slate-800">Análise de CNIS</h1>
           <p className="text-xs text-slate-500">Importe o extrato e calcule aposentadoria + salário de benefício</p>
         </div>
-        <a href="/previdencia" className="ml-auto text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+        <Link href="/previdencia" className="ml-auto text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
           ← Calculadoras
-        </a>
+        </Link>
       </div>
 
       <div className="flex-1 p-6 max-w-6xl mx-auto w-full space-y-5">
@@ -149,25 +195,53 @@ export default function CNISPage() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* Seletor de cliente */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                <Users className="w-3 h-3 inline mr-1" />Cliente (opcional)
+              </label>
+              <select
+                value={clienteId}
+                onChange={e => setClienteId(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">— Análise avulsa —</option>
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}{c.cpf_cnpj ? ` · ${c.cpf_cnpj}` : ''}
+                  </option>
+                ))}
+              </select>
+              {extratoAnterior && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  Extrato anterior: {new Date(extratoAnterior.created_at).toLocaleDateString('pt-BR')}
+                  {' '}({extratoAnterior.total_competencias} competências)
+                </p>
+              )}
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Sexo *</label>
-              <select value={sexo} onChange={e => setSexo(e.target.value as 'M' | 'F' | '')}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select
+                value={sexo}
+                onChange={e => setSexo(e.target.value as 'M' | 'F' | '')}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
                 <option value="">Selecione</option>
                 <option value="M">Masculino</option>
                 <option value="F">Feminino</option>
               </select>
             </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Data de Nascimento *</label>
-              <input type="date" value={dataNasc} onChange={e => setDataNasc(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">ID do Cliente (opcional)</label>
-              <input value={clienteId} onChange={e => setClienteId(e.target.value)}
-                placeholder="UUID do cliente para salvar"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input
+                type="date"
+                value={dataNasc}
+                onChange={e => setDataNasc(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           </div>
 
@@ -219,10 +293,29 @@ export default function CNISPage() {
             </div>
           )}
 
-          <button onClick={importar} disabled={!arquivo || carregando || !sexo || !dataNasc}
-            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors">
-            {carregando ? <><Loader2 className="w-4 h-4 animate-spin" />Processando...</> : <><BarChart3 className="w-4 h-4" />Importar e Calcular</>}
+          <button
+            onClick={importar}
+            disabled={!arquivo || carregando || !sexo || !dataNasc}
+            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+          >
+            {carregando
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Processando...</>
+              : <><BarChart3 className="w-4 h-4" />{clienteId ? `Importar e Salvar para ${clienteSelecionado?.nome ?? 'cliente'}` : 'Importar e Calcular'}</>
+            }
           </button>
+
+          {/* Link de retorno ao cliente após salvar */}
+          {resultado?.extratoId && clienteId && (
+            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
+              <p className="text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                Extrato salvo com sucesso!
+              </p>
+              <Link href={`/clientes/${clienteId}`} className="text-sm text-green-700 font-medium hover:underline">
+                ← Ver perfil do cliente
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Resultados */}
@@ -236,7 +329,7 @@ export default function CNISPage() {
                     <User className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">{d.nomeSegurado || 'Segurado'}</h2>
+                    <h2 className="text-lg font-bold text-slate-800">{d.nomeSegurado || clienteSelecionado?.nome || 'Segurado'}</h2>
                     <p className="text-sm text-slate-500">
                       {d.cpf ? `CPF: ${d.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}` : ''}
                       {d.dataNascimento ? ` · Nascimento: ${formatDate(d.dataNascimento)}` : ''}
@@ -436,6 +529,19 @@ export default function CNISPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// ─── Export default com Suspense (obrigatório para useSearchParams no App Router) ─
+export default function CNISPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-full text-slate-400 text-sm gap-2">
+        <Loader2 className="w-4 h-4 animate-spin" />Carregando...
+      </div>
+    }>
+      <CNISPage />
+    </Suspense>
   )
 }
 

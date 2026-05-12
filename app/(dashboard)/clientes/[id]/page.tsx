@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Pencil, FolderOpen, DollarSign, Mail, Phone, MapPin } from 'lucide-react'
+import { ArrowLeft, Pencil, FolderOpen, DollarSign, Mail, Phone, MapPin, BarChart3 } from 'lucide-react'
 import { formatDate, formatMoeda } from '@/lib/utils'
 import CopiarLinkPortal from './_copiar-link'
 import WhatsappButton from './_whatsapp-button'
@@ -49,6 +49,11 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
           </span>
         </div>
         <AbrirPasta nome={cliente.nome} pastaPath={cliente.pasta_path ?? null} />
+        <Link href={`/previdencia/cnis?clienteId=${id}`}
+          className="flex items-center gap-2 border border-blue-200 text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <BarChart3 className="w-4 h-4" />
+          CNIS
+        </Link>
         <WhatsappButton clienteId={id} nome={cliente.nome} telefone={cliente.telefone ?? null} />
         <CopiarLinkPortal token={cliente.token_portal} nome={cliente.nome} email={cliente.email} />
         <Link href={`/clientes/${id}/editar`}
