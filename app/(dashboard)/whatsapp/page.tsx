@@ -129,10 +129,15 @@ export default function WhatsappPage() {
 
   useEffect(() => {
     carregar(); carregarColunas(); carregarRespostas(); processarAgendamentos()
+    // Debounce de 800ms para evitar carregar() duplo (realtime + explicit)
+    let timer: ReturnType<typeof setTimeout>
     const ch = supabase.channel('wa_crm')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'atendimentos_whatsapp' }, () => carregar())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'atendimentos_whatsapp' }, () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => carregar(), 800)
+      })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { clearTimeout(timer); supabase.removeChannel(ch) }
   }, [])
 
   useEffect(() => {
@@ -155,9 +160,22 @@ export default function WhatsappPage() {
     }
   }, [atendimentos])
 
+  // Remove mensagens duplicadas (mesmo de+texto em janela de 3s)
+  function dedupMensagens(msgs: Mensagem[]): Mensagem[] {
+    const seen = new Set<string>()
+    return (msgs ?? []).filter(m => {
+      const janela = Math.floor(new Date(m.timestamp).getTime() / 3000)
+      const key = `${m.de}|${m.texto.slice(0, 50)}|${janela}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
   async function carregar() {
     const { data } = await supabase.from('atendimentos_whatsapp').select('*').order('ultimo_contato', { ascending: false, nullsFirst: false })
-    setAtendimentos((data as Atendimento[]) ?? [])
+    const lista = ((data as Atendimento[]) ?? []).map(a => ({ ...a, mensagens: dedupMensagens(a.mensagens) }))
+    setAtendimentos(lista)
     setLoading(false)
   }
   async function carregarColunas() {
@@ -214,10 +232,13 @@ export default function WhatsappPage() {
       const res = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jid: historico.whatsapp_jid ?? null, telefone: historico.telefone ?? null, mensagem: resposta.trim(), atendimentoId: historico.id }) })
       const data = await res.json()
       if (res.ok) {
+        // Adiciona otimisticamente para resposta imediata (dedup cuida de possível duplicata do realtime)
+        const nova: Mensagem = { texto: resposta.trim(), timestamp: new Date().toISOString(), de: 'Você' }
+        setHistorico(h => h ? { ...h, mensagens: dedupMensagens([...(h.mensagens ?? []), nova]) } : h)
+        setAtendimentos(prev => prev.map(a => a.id === historico!.id
+          ? { ...a, mensagens: dedupMensagens([...(a.mensagens ?? []), nova]), ultima_mensagem: resposta.trim() }
+          : a))
         setResposta(''); setShowRespostas(false)
-        // Não adiciona otimisticamente — o realtime (carregar) vai trazer do banco
-        // evitando duplicação quando o webhook + send route ambos salvam
-        await carregar()
       } else { setErroEnvio(data?.error || `Erro ${res.status}`) }
     } catch { setErroEnvio('Erro de conexão') } finally { setEnviando(false) }
   }

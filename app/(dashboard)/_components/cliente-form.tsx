@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Folder } from 'lucide-react'
+
+const BASE_PATH = 'G:\\Meu Drive\\ESCRITÓRIO\\PROCESSOS LUCY'
 
 type Props = {
   cliente?: {
@@ -15,6 +17,7 @@ type Props = {
     telefone: string | null
     endereco: string | null
     observacoes: string | null
+    pasta_path: string | null
   }
 }
 
@@ -32,6 +35,7 @@ export default function ClienteForm({ cliente }: Props) {
     telefone: cliente?.telefone ?? '',
     endereco: cliente?.endereco ?? '',
     observacoes: cliente?.observacoes ?? '',
+    pasta_path: cliente?.pasta_path ?? '',
   })
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -50,6 +54,7 @@ export default function ClienteForm({ cliente }: Props) {
       telefone: form.telefone || null,
       endereco: form.endereco || null,
       observacoes: form.observacoes || null,
+      pasta_path: form.pasta_path || null,
     }
 
     const { error } = cliente
@@ -99,6 +104,27 @@ export default function ClienteForm({ cliente }: Props) {
         <div className="col-span-2">
           <label className={labelClass}>Endereço</label>
           <input value={form.endereco} onChange={set('endereco')} className={fieldClass} placeholder="Rua, número, bairro, cidade - UF" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelClass}>Caminho da Pasta</label>
+          <div className="flex gap-2">
+            <input
+              value={form.pasta_path}
+              onChange={set('pasta_path')}
+              className={fieldClass}
+              placeholder={`${BASE_PATH}\\NOME DO CLIENTE`}
+            />
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, pasta_path: `${BASE_PATH}\\${f.nome.trim().toUpperCase() || 'NOME DO CLIENTE'}` }))}
+              title="Sugerir caminho baseado no nome"
+              className="flex-shrink-0 flex items-center gap-1.5 border border-slate-200 text-slate-600 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              <Folder className="w-4 h-4" />
+              Sugerir
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">Caminho completo no Windows/Drive. Clique em &quot;Sugerir&quot; para gerar automaticamente.</p>
         </div>
         <div className="col-span-2">
           <label className={labelClass}>Observações</label>

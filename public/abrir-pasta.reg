@@ -1,0 +1,18 @@
+Windows Registry Editor Version 5.00
+
+; Protocolo opendir:// — abre pasta no Windows Explorer
+; Instale com duplo clique e aceite o aviso do Windows (fazer apenas uma vez)
+
+[HKEY_CLASSES_ROOT\opendir]
+@="URL:Abrir Pasta"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\opendir\DefaultIcon]
+@="explorer.exe,0"
+
+[HKEY_CLASSES_ROOT\opendir\shell]
+
+[HKEY_CLASSES_ROOT\opendir\shell\open]
+
+[HKEY_CLASSES_ROOT\opendir\shell\open\command]
+@="powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"$u = '%1'; $p = $u -replace 'opendir:///', '' -replace '/', '\\\\' -replace '%20', ' '; Start-Process $p\""

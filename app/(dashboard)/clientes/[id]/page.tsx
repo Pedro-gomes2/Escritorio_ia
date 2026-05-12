@@ -48,7 +48,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
             {cliente.tipo === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
           </span>
         </div>
-        <AbrirPasta nome={cliente.nome} />
+        <AbrirPasta nome={cliente.nome} pastaPath={cliente.pasta_path ?? null} />
         <WhatsappButton clienteId={id} nome={cliente.nome} telefone={cliente.telefone ?? null} />
         <CopiarLinkPortal token={cliente.token_portal} nome={cliente.nome} email={cliente.email} />
         <Link href={`/clientes/${id}/editar`}

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Plus, Search, Users, Phone, Mail, Building2, User } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import DeleteClienteButton from './_components/delete-cliente-button'
+import AbrirPasta from './[id]/_abrir-pasta'
 
 export default async function ClientesPage({
   searchParams,
@@ -102,6 +103,7 @@ export default async function ClientesPage({
                     </p>
                   </div>
                 </Link>
+                <AbrirPasta nome={cliente.nome} pastaPath={cliente.pasta_path ?? null} compact />
                 <DeleteClienteButton id={cliente.id} nome={cliente.nome} />
               </div>
             ))}
