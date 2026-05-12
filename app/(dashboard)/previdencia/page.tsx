@@ -127,7 +127,7 @@ function calcularPlano(
     inss,
     idadeAposentadoria: idadeMinima,
     faltaIdadeMeses,
-    contribuicaoMinima,
+    contribuicaoMinimaAnos: contribuicaoMinima,
     faltaContribuicaoMeses,
     podeAposentar,
     faltaParaAposentar,
