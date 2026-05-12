@@ -179,17 +179,26 @@ export function parsearCNISPdf(texto: string): DadosCNIS {
   if (/\b(masculino|homem)\b/i.test(texto)) sexo = 'M'
   else if (/\b(feminino|mulher)\b/i.test(texto)) sexo = 'F'
 
-  // Competências — padrão principal do extrato CNIS impresso/PDF
-  // Linha típica: "01/2020  EMPRESA XYZ  1234567890  Empregado  R$ 3.500,00  R$ 315,00  A"
+  // Competências — extrato CNIS PDF
+  // O pdf-parse coloca cada célula da tabela em linha separada, então:
+  //   linha i+0: "01/2024"
+  //   linha i+1: "EMPRESA XYZ LTDA"
+  //   linha i+2: "12.345.678/0001-90"
+  //   linha i+3: "Empregado"
+  //   linha i+4: "3.500,00"    ← remuneração
+  //   linha i+5: "315,00"      ← contribuição
+  //   linha i+6: "A"           ← indicador
+  // Estratégia: ao encontrar MM/AAAA, olha as próximas 8 linhas para valor + indicador.
   const competencias: Competencia[] = []
-  const visto = new Set<string>()
+  // Mapa: chave → remuneração máxima (para múltiplos vínculos no mesmo mês)
+  const melhor = new Map<string, { remuneracao: number; indicador: string }>()
 
-  // Regex para competência no formato MM/AAAA seguida de valores monetários
-  const reComp = /(\d{2}\/\d{4})\s+(.{3,50?})\s+([\d.,]+)\s*(?:A|I)?\s*$/gm
-  const reCompSimples = /(\d{2})\/(\d{4})\s[\s\S]{0,100}?([\d]{1,3}(?:\.\d{3})*,\d{2})/g
+  const reValor = /(?:R\$\s*)?([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/
 
-  // Estratégia 1: linha por linha, detectar padrão MM/AAAA + valor
-  for (const linha of linhas) {
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i]
+
+    // Detecta linha que começa com MM/AAAA (com ou sem texto adicional)
     const mComp = linha.match(/^(\d{2})\/(\d{4})/)
     if (!mComp) continue
 
@@ -198,21 +207,50 @@ export function parsearCNISPdf(texto: string): DadosCNIS {
     if (mes < 1 || mes > 12 || ano < 1976 || ano > 2030) continue
 
     const chave = `${mes}/${ano}`
-    if (visto.has(chave)) continue
 
-    // Extrai valor monetário da linha
-    const valores = linha.match(/[\d]{1,3}(?:\.[\d]{3})*,[\d]{2}/g) ?? []
-    const remuneracao = valores.length > 0 && valores[0]
-      ? parseFloat(valores[0].replace(/\./g, '').replace(',', '.'))
-      : 0
+    // Verifica se o valor já está na mesma linha (formato "01/2024 ... 3.500,00 A")
+    let remuneracao = 0
+    let indicador = 'A'
 
-    // Indicador A/I no fim da linha
-    const indicador = linha.match(/\b([AI])\s*$/)?.[1] ?? 'A'
+    const valoresNaLinha = linha.match(/[\d]{1,3}(?:\.[\d]{3})*,[\d]{2}/g) ?? []
+    if (valoresNaLinha.length > 0) {
+      remuneracao = parseFloat(valoresNaLinha[0].replace(/\./g, '').replace(',', '.')) || 0
+      indicador = linha.match(/\b([AI])\s*$/)?.[1] ?? 'A'
+    } else {
+      // Look-ahead: busca nas próximas 8 linhas (para cada célula em linha separada)
+      for (let j = i + 1; j < Math.min(i + 9, linhas.length); j++) {
+        const prox = linhas[j]
 
-    // Empregador: texto entre a competência e o valor
-    const empregador = linha.replace(/^\d{2}\/\d{4}\s*/, '').replace(/[\d.,]+.*$/, '').trim()
+        // Para se encontrar outra competência
+        if (/^\d{2}\/\d{4}/.test(prox)) break
 
-    visto.add(chave)
+        // Detecta indicador A ou I em linha isolada
+        if (/^[AI]$/.test(prox.trim())) {
+          indicador = prox.trim()
+          continue
+        }
+
+        // Detecta valor monetário (primeiro encontrado = remuneração)
+        if (remuneracao === 0) {
+          const mVal = prox.match(reValor)
+          if (mVal) {
+            remuneracao = parseFloat(mVal[1].replace(/\./g, '').replace(',', '.')) || 0
+          }
+        }
+      }
+    }
+
+    // Guarda o maior valor para o mês (múltiplos vínculos)
+    const anterior = melhor.get(chave)
+    if (!anterior || remuneracao > anterior.remuneracao) {
+      melhor.set(chave, { remuneracao, indicador })
+    }
+  }
+
+  // Converte o mapa para array de competências
+  for (const [chave, { remuneracao, indicador }] of melhor) {
+    const [mesStr, anoStr] = chave.split('/')
+    const mes = parseInt(mesStr), ano = parseInt(anoStr)
     competencias.push({
       competencia: `${String(mes).padStart(2, '0')}/${ano}`,
       ano, mes, remuneracao,
@@ -221,17 +259,17 @@ export function parsearCNISPdf(texto: string): DadosCNIS {
     })
   }
 
-  // Estratégia 2: regex sobre texto completo (fallback)
+  // Estratégia 2 (fallback): regex multi-linha sobre texto completo
   if (competencias.length < 3) {
+    const reCompFull = /(\d{2})\/(\d{4})[\s\S]{0,200}?([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/g
+    const visto2 = new Set(melhor.keys())
     let m: RegExpExecArray | null
-    reComp.lastIndex = 0
-    while ((m = reComp.exec(texto)) !== null) {
-      const [mesStr, anoStr] = m[1].split('/')
-      const mes = parseInt(mesStr), ano = parseInt(anoStr)
+    while ((m = reCompFull.exec(texto)) !== null) {
+      const mes = parseInt(m[1]), ano = parseInt(m[2])
       if (mes < 1 || mes > 12 || ano < 1976) continue
       const chave = `${mes}/${ano}`
-      if (visto.has(chave)) continue
-      visto.add(chave)
+      if (visto2.has(chave)) continue
+      visto2.add(chave)
       const remuneracao = parseFloat(m[3].replace(/\./g, '').replace(',', '.')) || 0
       competencias.push({
         competencia: `${String(mes).padStart(2, '0')}/${ano}`,
