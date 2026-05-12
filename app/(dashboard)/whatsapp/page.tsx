@@ -145,6 +145,19 @@ export default function WhatsappPage() {
   const qrBase64 = evoStatus?.qrcode?.base64 || evoStatus?.base64
 
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
+  const [telefoneInput, setTelefoneInput] = useState('')
+  const [salvandoTelefone, setSalvandoTelefone] = useState(false)
+
+  async function salvarTelefoneCard() {
+    if (!historico || !telefoneInput.trim()) return
+    setSalvandoTelefone(true)
+    const tel = telefoneInput.trim().replace(/\D/g, '')
+    await supabase.from('atendimentos_whatsapp').update({ telefone: tel }).eq('id', historico.id)
+    setHistorico(h => h ? { ...h, telefone: tel } : h)
+    setAtendimentos(prev => prev.map(a => a.id === historico.id ? { ...a, telefone: tel } : a))
+    setTelefoneInput('')
+    setSalvandoTelefone(false)
+  }
 
   async function enviarResposta() {
     if (!historico?.whatsapp_jid || !resposta.trim()) return
@@ -559,13 +572,30 @@ export default function WhatsappPage() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                {historico.telefone && (
+                {historico.telefone ? (
                   <a href={telefoneLink(historico.telefone)} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 text-xs text-green-600 hover:underline">
                     <Phone className="w-3 h-3" />
                     {historico.telefone} — Abrir no WhatsApp
                   </a>
-                )}
+                ) : historico.whatsapp_jid ? (
+                  <div className="flex items-center gap-1 mt-1">
+                    <input
+                      type="text"
+                      value={telefoneInput}
+                      onChange={e => setTelefoneInput(e.target.value)}
+                      placeholder="Adicionar telefone (ex: 5521999...)"
+                      className="flex-1 text-xs border border-amber-300 bg-amber-50 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    />
+                    <button
+                      onClick={salvarTelefoneCard}
+                      disabled={salvandoTelefone || !telefoneInput.trim()}
+                      className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded transition-colors disabled:opacity-50"
+                    >
+                      {salvandoTelefone ? '...' : <Check className="w-3 h-3" />}
+                    </button>
+                  </div>
+                ) : null}
                 {historico.assunto && (
                   <p className="text-xs text-slate-500 mt-1">{historico.assunto}</p>
                 )}
