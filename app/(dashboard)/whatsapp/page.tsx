@@ -317,7 +317,9 @@ export default function WhatsappPage() {
   })
 
   // ── Header compartilhado ──────────────────────────────────────────────────
-  const Header = () => (
+  // IMPORTANTE: definidos como variáveis JSX (não componentes) para evitar
+  // remount a cada render e perda de foco no textarea.
+  const headerJsx = (
     <div className="flex-shrink-0 px-5 py-3 bg-white border-b border-slate-200 flex items-center gap-3 flex-wrap">
       <div className="flex items-center gap-2 mr-2">
         <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -358,7 +360,7 @@ export default function WhatsappPage() {
   )
 
   // ── QR Panel ──────────────────────────────────────────────────────────────
-  const QRPanel = () => showQR ? (
+  const qrPanelJsx = showQR ? (
     <div className="flex-shrink-0 px-5 py-3 border-b border-slate-200 bg-amber-50">
       <div className="flex items-start gap-4">
         {evoConectado ? (
@@ -376,10 +378,10 @@ export default function WhatsappPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // BOARD MODE
   // ─────────────────────────────────────────────────────────────────────────
-  const BoardView = () => (
+  const boardJsx = (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <Header />
-      <QRPanel />
+      {headerJsx}
+      {qrPanelJsx}
 
       {/* Stats */}
       <div className="flex-shrink-0 px-5 py-2 bg-white border-b border-slate-100 flex items-center gap-4 overflow-x-auto">
@@ -489,10 +491,10 @@ export default function WhatsappPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // CHAT MODE
   // ─────────────────────────────────────────────────────────────────────────
-  const ChatView = () => (
+  const chatJsx = (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <Header />
-      <QRPanel />
+      {headerJsx}
+      {qrPanelJsx}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Lista lateral */}
@@ -723,7 +725,7 @@ export default function WhatsappPage() {
   )
 
   // ─── Modais ──────────────────────────────────────────────────────────────
-  const Modais = () => (<>
+  const modaisJsx = (<>
     {modalNovo && (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
@@ -785,8 +787,8 @@ export default function WhatsappPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-      {mode === 'board' ? <BoardView /> : <ChatView />}
-      <Modais />
+      {mode === 'board' ? boardJsx : chatJsx}
+      {modaisJsx}
     </div>
   )
 }

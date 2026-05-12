@@ -5,6 +5,7 @@ import { ArrowLeft, Pencil, FolderOpen, DollarSign, Mail, Phone, MapPin } from '
 import { formatDate, formatMoeda } from '@/lib/utils'
 import CopiarLinkPortal from './_copiar-link'
 import WhatsappButton from './_whatsapp-button'
+import AbrirPasta from './_abrir-pasta'
 
 export default async function ClienteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -47,6 +48,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
             {cliente.tipo === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
           </span>
         </div>
+        <AbrirPasta nome={cliente.nome} />
         <WhatsappButton clienteId={id} nome={cliente.nome} telefone={cliente.telefone ?? null} />
         <CopiarLinkPortal token={cliente.token_portal} nome={cliente.nome} email={cliente.email} />
         <Link href={`/clientes/${id}/editar`}
