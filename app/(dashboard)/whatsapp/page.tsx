@@ -119,6 +119,14 @@ export default function WhatsappPage() {
 
   useEffect(() => { if (mensagensRef.current) mensagensRef.current.scrollTop = mensagensRef.current.scrollHeight }, [historico?.mensagens])
 
+  // Auto-resize textarea conforme usuário digita
+  useEffect(() => {
+    const el = respostaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [resposta])
+
   useEffect(() => {
     carregar(); carregarColunas(); carregarRespostas(); processarAgendamentos()
     const ch = supabase.channel('wa_crm')
@@ -645,7 +653,7 @@ export default function WhatsappPage() {
                     placeholder="Digite uma mensagem..."
                     rows={1} style={{ minHeight:'44px', maxHeight:'120px' }}
                     className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none overflow-y-auto"
-                    onInput={e => { const el=e.currentTarget; el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px' }} />
+                    />
                   <button onClick={enviarResposta} disabled={enviando||!resposta.trim()||(!historico.whatsapp_jid&&!historico.telefone)} className="bg-green-500 hover:bg-green-600 text-white p-2.5 rounded-xl disabled:opacity-50 flex-shrink-0"><Send className="w-4 h-4" /></button>
                 </div>
               </div>

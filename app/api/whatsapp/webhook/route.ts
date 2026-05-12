@@ -57,10 +57,22 @@ export async function POST(req: NextRequest) {
     const novaMensagem = { texto, timestamp, de: nome }
     const supabase = createAdminClient()
 
+    // Busca atendimento existente: por JID ou por telefone (para não duplicar cards criados manualmente)
+    const orFiltros = [`whatsapp_jid.eq.${jid}`, `whatsapp_jid.eq.${whatsappJidEnvio}`]
+    if (telefone) {
+      // Tenta com e sem DDI 55
+      orFiltros.push(`telefone.eq.${telefone}`)
+      if (telefone.startsWith('55')) {
+        orFiltros.push(`telefone.eq.${telefone.slice(2)}`)
+      } else {
+        orFiltros.push(`telefone.eq.55${telefone}`)
+      }
+    }
+
     const { data: existente } = await supabase
       .from('atendimentos_whatsapp')
-      .select('id, mensagens, telefone')
-      .or(`whatsapp_jid.eq.${jid},whatsapp_jid.eq.${whatsappJidEnvio}`)
+      .select('id, mensagens, telefone, whatsapp_jid')
+      .or(orFiltros.join(','))
       .neq('coluna', 'finalizado')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -74,8 +86,9 @@ export async function POST(req: NextRequest) {
         ultimo_contato: timestamp,
         nao_lido: true,
       }
-      // Atualiza telefone se estava null e agora temos o número real
+      // Atualiza telefone e jid se estavam null
       if (telefone && !existente.telefone) updatePayload.telefone = telefone
+      if (!existente.whatsapp_jid) updatePayload.whatsapp_jid = whatsappJidEnvio
 
       await supabase
         .from('atendimentos_whatsapp')
