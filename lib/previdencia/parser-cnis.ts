@@ -213,7 +213,7 @@ export function parsearCNISPdf(texto: string): DadosCNIS {
     let indicador = 'A'
 
     const valoresNaLinha = linha.match(/[\d]{1,3}(?:\.[\d]{3})*,[\d]{2}/g) ?? []
-    if (valoresNaLinha.length > 0) {
+    if (valoresNaLinha.length > 0 && valoresNaLinha[0]) {
       remuneracao = parseFloat(valoresNaLinha[0].replace(/\./g, '').replace(',', '.')) || 0
       indicador = linha.match(/\b([AI])\s*$/)?.[1] ?? 'A'
     } else {
