@@ -11,7 +11,14 @@ import { createClient } from '@/lib/supabase/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface KanbanColuna { id: string; chave: string; nome: string; cor: string; ordem: number }
-interface Mensagem { texto: string; timestamp: string; de: string }
+interface Mensagem {
+  texto: string
+  timestamp: string
+  de: string
+  tipo_midia?: 'imagem' | 'audio' | 'video' | 'documento' | 'sticker' | null
+  url_midia?: string | null
+  nome_arquivo?: string | null
+}
 interface MensagemAgendada { id: string; atendimento_id: string; mensagem: string; enviar_em: string; enviado: boolean }
 interface Atendimento {
   id: string; nome: string; telefone: string | null; assunto: string | null
@@ -628,10 +635,41 @@ export default function WhatsappPage() {
                   const isVoce = msg.de === 'Você'
                   return (
                     <div key={i} className={`flex ${isVoce?'justify-end':'justify-start'}`}>
-                      <div className={`max-w-sm rounded-2xl px-4 py-2.5 shadow-sm ${isVoce?'bg-green-500 text-white rounded-br-sm':'bg-white text-slate-800 rounded-bl-sm'}`}>
-                        {!isVoce && <p className="text-xs font-semibold text-green-600 mb-0.5">{msg.de}</p>}
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.texto}</p>
-                        <p className={`text-xs mt-1 ${isVoce?'text-green-100':'text-slate-400'} text-right`}>{new Date(msg.timestamp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</p>
+                      <div className={`max-w-sm rounded-2xl shadow-sm overflow-hidden ${isVoce?'bg-green-500 text-white rounded-br-sm':'bg-white text-slate-800 rounded-bl-sm'}`}>
+                        {/* Mídia */}
+                        {msg.url_midia && msg.tipo_midia === 'imagem' && (
+                          <a href={msg.url_midia} target="_blank" rel="noopener noreferrer">
+                            <img src={msg.url_midia} alt="imagem" className="max-w-xs max-h-60 w-full object-cover" />
+                          </a>
+                        )}
+                        {msg.url_midia && msg.tipo_midia === 'sticker' && (
+                          <img src={msg.url_midia} alt="sticker" className="w-28 h-28 object-contain p-1" />
+                        )}
+                        {msg.url_midia && msg.tipo_midia === 'audio' && (
+                          <div className="px-4 pt-3 pb-1">
+                            <audio controls src={msg.url_midia} className="w-full max-w-xs h-8" style={{height:'36px'}} />
+                          </div>
+                        )}
+                        {msg.url_midia && msg.tipo_midia === 'video' && (
+                          <video controls src={msg.url_midia} className="max-w-xs max-h-52 w-full" />
+                        )}
+                        {msg.url_midia && msg.tipo_midia === 'documento' && (
+                          <a href={msg.url_midia} target="_blank" rel="noopener noreferrer"
+                            className={`flex items-center gap-2 px-4 py-3 ${isVoce?'text-green-100 hover:text-white':'text-blue-600 hover:text-blue-700'}`}>
+                            <FileText className="w-5 h-5 flex-shrink-0" />
+                            <span className="text-sm underline truncate max-w-52">{msg.nome_arquivo || 'Documento'}</span>
+                          </a>
+                        )}
+                        {/* Texto / legenda */}
+                        <div className="px-4 py-2.5">
+                          {!isVoce && <p className="text-xs font-semibold text-green-600 mb-0.5">{msg.de}</p>}
+                          {(msg.texto && msg.texto !== `[${msg.tipo_midia}]`) && (
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.texto}</p>
+                          )}
+                          <p className={`text-xs mt-1 ${isVoce?'text-green-100':'text-slate-400'} text-right`}>
+                            {new Date(msg.timestamp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )
