@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, Pencil, FolderOpen, DollarSign, Mail, Phone, MapPin } from 'lucide-react'
 import { formatDate, formatMoeda } from '@/lib/utils'
 import CopiarLinkPortal from './_copiar-link'
+import WhatsappButton from './_whatsapp-button'
 
 export default async function ClienteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -46,6 +47,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
             {cliente.tipo === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
           </span>
         </div>
+        <WhatsappButton clienteId={id} nome={cliente.nome} telefone={cliente.telefone ?? null} />
         <CopiarLinkPortal token={cliente.token_portal} nome={cliente.nome} email={cliente.email} />
         <Link href={`/clientes/${id}/editar`}
           className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
