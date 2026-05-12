@@ -329,7 +329,7 @@ export default function WhatsappPage() {
         {evoConectado && evoStatus ? <Wifi className="w-4 h-4" /> : <QrCode className="w-4 h-4" />}
       </button>
       <button onClick={carregar} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"><RefreshCw className="w-4 h-4" /></button>
-      <button onClick={() => setShowRespostas(false)||setModalRespostas(true)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors" title="Respostas rápidas"><Zap className="w-4 h-4 text-yellow-500" /></button>
+      <button onClick={() => { setShowRespostas(false); setModalRespostas(true) }} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors" title="Respostas rápidas"><Zap className="w-4 h-4 text-yellow-500" /></button>
       <button onClick={() => setModalNovo(true)} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
         <Plus className="w-4 h-4" />Novo
       </button>
