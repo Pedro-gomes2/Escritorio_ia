@@ -160,7 +160,7 @@ export default function WhatsappPage() {
   }
 
   async function enviarResposta() {
-    if (!historico?.whatsapp_jid || !resposta.trim()) return
+    if ((!historico?.whatsapp_jid && !historico?.telefone) || !resposta.trim()) return
     setEnviando(true)
     setErroEnvio(null)
     try {
@@ -168,7 +168,8 @@ export default function WhatsappPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          jid: historico.whatsapp_jid,
+          jid: historico.whatsapp_jid ?? null,
+          telefone: historico.telefone ?? null,
           mensagem: resposta.trim(),
           atendimentoId: historico.id,
         }),
@@ -680,7 +681,7 @@ export default function WhatsappPage() {
               </div>
 
               {/* Campo de resposta */}
-              {historico.whatsapp_jid ? (
+              {(historico.whatsapp_jid || historico.telefone) ? (
                 <div className="p-3 border-t border-slate-100">
                   {erroEnvio && (
                     <div className="mb-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
@@ -732,7 +733,7 @@ export default function WhatsappPage() {
                 </div>
               ) : (
                 <div className="p-3 border-t border-slate-100">
-                  <p className="text-xs text-slate-400 text-center">Atendimento manual · sem WhatsApp vinculado</p>
+                  <p className="text-xs text-slate-400 text-center">Sem telefone cadastrado · adicione o número acima para enviar</p>
                 </div>
               )}
             </div>

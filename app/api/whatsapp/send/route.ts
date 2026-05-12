@@ -7,9 +7,9 @@ const INSTANCE = process.env.EVOLUTION_INSTANCE!
 
 export async function POST(req: NextRequest) {
   try {
-    const { jid, mensagem, atendimentoId } = await req.json()
+    const { jid, telefone, mensagem, atendimentoId } = await req.json()
 
-    if (!jid || !mensagem?.trim()) {
+    if ((!jid && !telefone) || !mensagem?.trim()) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
@@ -18,26 +18,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Variáveis de ambiente não configuradas no servidor' }, { status: 500 })
     }
 
-    // Extrai número limpo do JID
-    // JIDs @lid são identificadores internos do WhatsApp — precisamos do número real
-    let numero = jid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@lid', '')
+    let numero: string
 
-    // Se ainda parece LID (número muito longo ou sem prefixo de país), busca o atendimento
-    if (jid.includes('@lid') && atendimentoId) {
-      const supabase = createAdminClient()
-      const { data: atend } = await supabase
-        .from('atendimentos_whatsapp')
-        .select('telefone')
-        .eq('id', atendimentoId)
-        .single()
-      if (atend?.telefone) {
-        numero = atend.telefone.replace(/\D/g, '')
-        if (!numero.startsWith('55')) numero = '55' + numero
-      } else {
-        return NextResponse.json({
-          error: 'Contato usa formato LID — adicione o telefone manualmente no card para poder responder'
-        }, { status: 400 })
+    if (jid) {
+      // Extrai número limpo do JID
+      numero = jid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@lid', '')
+
+      // Se for @lid, busca o telefone salvo no atendimento
+      if (jid.includes('@lid') && atendimentoId) {
+        const supabase = createAdminClient()
+        const { data: atend } = await supabase
+          .from('atendimentos_whatsapp')
+          .select('telefone')
+          .eq('id', atendimentoId)
+          .single()
+        if (atend?.telefone) {
+          numero = atend.telefone.replace(/\D/g, '')
+          if (!numero.startsWith('55')) numero = '55' + numero
+        } else {
+          return NextResponse.json({
+            error: 'Contato usa formato LID — adicione o telefone manualmente no card para poder responder'
+          }, { status: 400 })
+        }
       }
+    } else {
+      // Atendimento manual — usa o telefone diretamente
+      numero = (telefone as string).replace(/\D/g, '')
+      if (!numero.startsWith('55')) numero = '55' + numero
     }
 
     // Envia mensagem via Evolution API v1
