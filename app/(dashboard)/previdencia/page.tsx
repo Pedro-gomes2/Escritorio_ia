@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Calculator, User, TrendingUp, Clock, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, FileText, BarChart3 } from 'lucide-react'
+import { Calculator, User, TrendingUp, Clock, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, BarChart3, Users } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 // Tabelas INSS 2024 (progressiva)
 const INSS_FAIXAS = [
@@ -63,15 +64,13 @@ interface Plano {
   salarioBruto: number
   salarioLiquido: number
   inss: number
-  // Regra definitiva
   idadeAposentadoria: number
   faltaIdadeMeses: number
   contribuicaoMinimaAnos: number
   faltaContribuicaoMeses: number
   podeAposentar: boolean
-  faltaParaAposentar: number // meses - o maior entre falta idade e falta contribuição
+  faltaParaAposentar: number
   estimativaBeneficio: number
-  // Complementar
   sugestaoPrevidenciaPrivada: number
   rendaTotal: number
 }
@@ -87,35 +86,28 @@ function calcularPlano(
   const dataNasc = new Date(nascimento)
   const dataInicio = new Date(inicioContribuicao)
 
-  // Idade em meses
   const idadeMeses = Math.floor((hoje.getTime() - dataNasc.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
   const idadeAtual = Math.floor(idadeMeses / 12)
-
-  // Tempo de contribuição em meses
   const tempoContribuicaoMeses = Math.max(0, Math.floor((hoje.getTime() - dataInicio.getTime()) / (1000 * 60 * 60 * 24 * 30.44)))
 
-  // Regra definitiva pós-reforma 2019
   const idadeMinima = sexo === 'M' ? 65 : 62
-  const contribuicaoMinima = sexo === 'M' ? 20 : 15 // anos
+  const contribuicaoMinima = sexo === 'M' ? 20 : 15
 
   const faltaIdadeMeses = Math.max(0, idadeMinima * 12 - idadeMeses)
   const faltaContribuicaoMeses = Math.max(0, contribuicaoMinima * 12 - tempoContribuicaoMeses)
   const faltaParaAposentar = Math.max(faltaIdadeMeses, faltaContribuicaoMeses)
   const podeAposentar = faltaParaAposentar === 0
 
-  // Estimativa do benefício INSS (70% do salário de contribuição + 1% por ano acima do mínimo)
   const salarioContribuicao = Math.min(salario, TETO_INSS)
   const anosContribuicao = Math.floor(tempoContribuicaoMeses / 12)
   const anosAposMinimo = Math.max(0, anosContribuicao - contribuicaoMinima)
   const percentual = Math.min(0.70 + anosAposMinimo * 0.01, 1.0)
   const estimativaBeneficio = salarioContribuicao * percentual
 
-  // Financeiro atual
   const inss = calcularINSS(salario)
   const irrf = calcularIRRF(salario - inss)
   const salarioLiquido = salario - inss - irrf
 
-  // Sugestão previdência privada (diferença para manter padrão de vida)
   const sugestaoPrevidenciaPrivada = Math.max(0, salarioLiquido * 0.7 - estimativaBeneficio)
   const rendaTotal = estimativaBeneficio + sugestaoPrevidenciaPrivada
 
@@ -138,7 +130,16 @@ function calcularPlano(
   }
 }
 
+interface ClienteItem {
+  id: string
+  nome: string
+}
+
 export default function PrevidenciaPage() {
+  const supabase = createClient()
+  const [clientes, setClientes] = useState<ClienteItem[]>([])
+  const [clienteId, setClienteId] = useState('')
+
   const [form, setForm] = useState({
     nome: '',
     nascimento: '',
@@ -149,6 +150,40 @@ export default function PrevidenciaPage() {
   })
   const [plano, setPlano] = useState<Plano | null>(null)
   const [showCalc, setShowCalc] = useState(false)
+
+  // Carrega lista de clientes
+  useEffect(() => {
+    supabase.from('clientes').select('id, nome').order('nome')
+      .then(({ data }) => setClientes(data ?? []))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ao selecionar cliente, preenche nome e tenta buscar dados do CNIS
+  async function aoSelecionarCliente(id: string) {
+    setClienteId(id)
+    if (!id) return
+
+    const cliente = clientes.find(c => c.id === id)
+    if (cliente) {
+      setForm(f => ({ ...f, nome: cliente.nome }))
+    }
+
+    // Busca extrato CNIS mais recente para pré-preencher nascimento e sexo
+    const { data: extrato } = await supabase
+      .from('cnis_extratos')
+      .select('sexo, data_nascimento')
+      .eq('cliente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (extrato) {
+      setForm(f => ({
+        ...f,
+        ...(extrato.sexo ? { sexo: extrato.sexo as 'M' | 'F' } : {}),
+        ...(extrato.data_nascimento ? { nascimento: extrato.data_nascimento } : {}),
+      }))
+    }
+  }
 
   function gerarPlano() {
     if (!form.nome || !form.nascimento || !form.salario || !form.inicioContribuicao) return
@@ -171,7 +206,7 @@ export default function PrevidenciaPage() {
     )
   }
 
-  const inputClass = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputClass = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
 
   return (
     <div className="p-8 max-w-5xl">
@@ -198,6 +233,23 @@ export default function PrevidenciaPage() {
               <h2 className="font-semibold text-slate-700">Dados do Cliente</h2>
             </div>
             <div className="space-y-3">
+
+              {/* Seletor de cliente */}
+              <Field label="Selecionar cliente cadastrado">
+                <select
+                  value={clienteId}
+                  onChange={e => aoSelecionarCliente(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— Preencher manualmente —</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="border-t border-slate-100 pt-3" />
+
               <Field label="Nome do Cliente">
                 <input type="text" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
                   placeholder="Nome completo" className={inputClass} />
@@ -237,6 +289,13 @@ export default function PrevidenciaPage() {
               >
                 Gerar Plano Previdenciário
               </button>
+
+              {clienteId && (
+                <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Dados pré-preenchidos do cadastro
+                </p>
+              )}
             </div>
           </div>
         </div>

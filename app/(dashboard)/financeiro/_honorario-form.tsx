@@ -9,22 +9,34 @@ type Props = {
   clientes: { id: string; nome: string }[]
   processos: { id: string; titulo: string }[]
   defaultClienteId?: string
+  // Para edição
+  honorario?: {
+    id: string
+    descricao: string
+    valor: number
+    tipo: string
+    status: string
+    cliente_id: string | null
+    processo_id: string | null
+    vencimento: string | null
+  }
 }
 
-export default function HonorarioForm({ clientes, processos, defaultClienteId }: Props) {
+export default function HonorarioForm({ clientes, processos, defaultClienteId, honorario }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
+  const isEdit = !!honorario
 
   const [form, setForm] = useState({
-    descricao: '',
-    valor: '',
-    tipo: 'fixo',
-    status: 'pendente',
-    cliente_id: defaultClienteId ?? '',
-    processo_id: '',
-    vencimento: '',
+    descricao: honorario?.descricao ?? '',
+    valor: honorario?.valor?.toString() ?? '',
+    tipo: honorario?.tipo ?? 'fixo',
+    status: honorario?.status ?? 'pendente',
+    cliente_id: honorario?.cliente_id ?? defaultClienteId ?? '',
+    processo_id: honorario?.processo_id ?? '',
+    vencimento: honorario?.vencimento ?? '',
   })
 
   const set = (f: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -35,7 +47,7 @@ export default function HonorarioForm({ clientes, processos, defaultClienteId }:
     setLoading(true)
     setErro('')
 
-    const { error } = await supabase.from('honorarios').insert({
+    const payload = {
       descricao: form.descricao,
       valor: parseFloat(form.valor),
       tipo: form.tipo,
@@ -43,7 +55,11 @@ export default function HonorarioForm({ clientes, processos, defaultClienteId }:
       cliente_id: form.cliente_id || null,
       processo_id: form.processo_id || null,
       vencimento: form.vencimento || null,
-    })
+    }
+
+    const { error } = isEdit
+      ? await supabase.from('honorarios').update(payload).eq('id', honorario.id)
+      : await supabase.from('honorarios').insert(payload)
 
     if (error) {
       setErro('Erro ao salvar.')
@@ -55,7 +71,7 @@ export default function HonorarioForm({ clientes, processos, defaultClienteId }:
     router.refresh()
   }
 
-  const fieldClass = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const fieldClass = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white'
   const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5'
 
   return (
@@ -118,7 +134,7 @@ export default function HonorarioForm({ clientes, processos, defaultClienteId }:
         <button type="submit" disabled={loading}
           className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          Registrar Honorário
+          {isEdit ? 'Salvar Alterações' : 'Registrar Honorário'}
         </button>
       </div>
     </form>
